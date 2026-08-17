@@ -5,7 +5,15 @@ import { collectionGroup, query, where, onSnapshot } from '@react-native-firebas
 import { getFirestore } from '@react-native-firebase/firestore';
 import { getAuth } from '@react-native-firebase/auth';
 import { MapPin, Package, Clock } from 'lucide-react-native';
-import { Audio } from 'expo-av';
+import * as Notifications from 'expo-notifications';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 export default function DriverHomeScreen({ navigation }: any) {
   const [tasks, setTasks] = useState<any[]>([]);
@@ -14,18 +22,31 @@ export default function DriverHomeScreen({ navigation }: any) {
 
   const playNotification = async () => {
     try {
-      Vibration.vibrate([0, 400, 200, 400]); // Vibrate twice
+      Vibration.vibrate([0, 400, 200, 400]); // Keep the vibration!
       
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg' } 
-      );
-      await sound.playAsync();
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "New Task Assigned! 🚀",
+          body: "You have a new pickup/delivery request.",
+          sound: true, 
+        },
+        trigger: null, 
+      });
     } catch (error) {
-      console.log("Audio play error", error);
+      console.log("Notification error", error);
     }
   };
 
   useEffect(() => {
+    (async () => {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+    })();
+
     const auth = getAuth();
     const user = auth.currentUser;
     if (!user) return;
