@@ -1,23 +1,115 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Alert } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Alert, Dimensions, Animated, PanResponder, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getFirestore, doc, updateDoc } from '@react-native-firebase/firestore';
-import { MapPin, Phone, Package, Navigation, CheckCircle2, ChevronLeft } from 'lucide-react-native';
+import { Phone, Package, Navigation, ChevronLeft, ChevronRight, MapPin } from 'lucide-react-native';
+import MapView, { Marker, Polyline } from 'react-native-maps';
+import * as Location from 'expo-location';
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const SWIPE_TRACK_WIDTH = SCREEN_WIDTH - 40; // 20 padding on each side
+const SWIPE_THUMB_SIZE = 56;
+
+const SwipeButton = ({ onComplete, text, color, disabled }: any) => {
+  const pan = useRef(new Animated.ValueXY()).current;
+  const [completed, setCompleted] = useState(false);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => !disabled && !completed,
+      onPanResponderMove: (e, gesture) => {
+        if (disabled || completed) return;
+        if (gesture.dx > 0 && gesture.dx < SWIPE_TRACK_WIDTH - SWIPE_THUMB_SIZE) {
+          pan.setValue({ x: gesture.dx, y: 0 });
+        }
+      },
+      onPanResponderRelease: (e, gesture) => {
+        if (disabled || completed) return;
+        if (gesture.dx > SWIPE_TRACK_WIDTH * 0.6) {
+          Animated.spring(pan, {
+            toValue: { x: SWIPE_TRACK_WIDTH - SWIPE_THUMB_SIZE, y: 0 },
+            useNativeDriver: false,
+            bounciness: 0
+          }).start(() => {
+            setCompleted(true);
+            onComplete();
+          });
+        } else {
+          Animated.spring(pan, {
+            toValue: { x: 0, y: 0 },
+            useNativeDriver: false,
+            bounciness: 10
+          }).start();
+        }
+      },
+    })
+  ).current;
+
+  return (
+    <View style={styles.swipeTrackContainer}>
+      <View style={[styles.swipeTrack, { backgroundColor: disabled ? '#E5E7EB' : color + '20' }]}>
+        <Text style={[styles.swipeText, { color: disabled ? '#9CA3AF' : color }]}>
+          {disabled ? 'Updating...' : text}
+        </Text>
+        <Animated.View
+          style={[
+            styles.swipeThumb, 
+            { backgroundColor: disabled ? '#9CA3AF' : color, transform: [{ translateX: pan.x }] }
+          ]}
+          {...panResponder.panHandlers}
+        >
+          <ChevronRight color="white" size={24} />
+        </Animated.View>
+      </View>
+    </View>
+  );
+};
 
 export default function TaskDetailsScreen({ route, navigation }: any) {
   const { task } = route.params;
   const [updating, setUpdating] = useState(false);
+  const [customerCoords, setCustomerCoords] = useState<any>(null);
+  const [driverCoords, setDriverCoords] = useState<any>(null);
+  const [mapLoading, setMapLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          let location = await Location.getCurrentPositionAsync({});
+          setDriverCoords({
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+          });
+        }
+
+        const addressStr = `${task.shippingAddress?.houseNo}, ${task.shippingAddress?.area}, ${task.shippingAddress?.pincode}`;
+        const geocode = await Location.geocodeAsync(addressStr);
+        if (geocode.length > 0) {
+          setCustomerCoords({
+            latitude: geocode[0].latitude,
+            longitude: geocode[0].longitude,
+          });
+        }
+      } catch (error) {
+        console.error("Geocoding error", error);
+      } finally {
+        setMapLoading(false);
+      }
+    })();
+  }, []);
 
   const getNextStatusInfo = (currentStatus: string) => {
     switch (currentStatus) {
       case 'pickup_ready':
-        return { next: 'out_for_pickup', label: 'Start Pickup Journey', color: '#F59E0B' };
+        return { next: 'out_for_pickup', label: 'Swipe to Start Pickup', color: '#F59E0B' };
       case 'out_for_pickup':
-        return { next: 'in_progress', label: 'Mark as Picked Up', color: '#10B981' };
+        return { next: 'in_progress', label: 'Swipe to Mark Picked Up', color: '#10B981' };
       case 'delivery_ready':
-        return { next: 'out_for_delivery', label: 'Start Delivery Journey', color: '#3B82F6' };
+        return { next: 'out_for_delivery', label: 'Swipe to Start Delivery', color: '#3B82F6' };
       case 'out_for_delivery':
-        return { next: 'delivered', label: 'Mark as Delivered', color: '#10B981' };
+        return { next: 'delivered', label: 'Swipe to Mark Delivered', color: '#10B981' };
       default:
         return null;
     }
@@ -35,11 +127,12 @@ export default function TaskDetailsScreen({ route, navigation }: any) {
       await updateDoc(orderRef, {
         status: nextAction.next
       });
-      navigation.goBack();
+      setTimeout(() => {
+        navigation.goBack();
+      }, 500); // small delay to see the swipe complete
     } catch (error) {
       console.error("Error updating status:", error);
       Alert.alert("Error", "Could not update task status.");
-    } finally {
       setUpdating(false);
     }
   };
@@ -58,6 +151,31 @@ export default function TaskDetailsScreen({ route, navigation }: any) {
     }
   };
 
+  // Determine initial region for map
+  const getMapRegion = () => {
+    if (customerCoords) {
+      return {
+        latitude: customerCoords.latitude,
+        longitude: customerCoords.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      };
+    } else if (driverCoords) {
+      return {
+        latitude: driverCoords.latitude,
+        longitude: driverCoords.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      };
+    }
+    return {
+      latitude: 20.5937,
+      longitude: 78.9629,
+      latitudeDelta: 10,
+      longitudeDelta: 10,
+    }; // Default to India roughly
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -68,7 +186,64 @@ export default function TaskDetailsScreen({ route, navigation }: any) {
         <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 100 }}>
+        
+        {/* MAP SECTION */}
+        <View style={styles.mapContainer}>
+          {mapLoading ? (
+            <View style={styles.mapLoading}>
+              <ActivityIndicator size="large" color="#8B5CF6" />
+              <Text style={{ marginTop: 8, color: '#6B7280' }}>Loading map...</Text>
+            </View>
+          ) : (
+            <MapView
+              style={styles.map}
+              initialRegion={getMapRegion()}
+              showsUserLocation={true}
+            >
+              {customerCoords && (
+                <Marker 
+                  coordinate={customerCoords} 
+                  title="Customer Location" 
+                  description="Pickup/Delivery point"
+                  pinColor="red"
+                />
+              )}
+              {driverCoords && customerCoords && (
+                <Polyline
+                  coordinates={[driverCoords, customerCoords]}
+                  strokeColor="#3B82F6"
+                  strokeWidth={4}
+                  geodesic={true}
+                  lineDashPattern={[0]}
+                />
+              )}
+            </MapView>
+          )}
+          
+          <TouchableOpacity style={styles.mapNavigateBtn} onPress={openMaps}>
+            <Navigation size={18} color="white" />
+            <Text style={{ color: 'white', fontWeight: 'bold', marginLeft: 6 }}>Navigate</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* DETAILS SECTION */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Customer Information</Text>
+          <View style={styles.infoRow}>
+            <MapPin size={20} color="#6B7280" />
+            <Text style={styles.infoText}>
+              {task.shippingAddress?.houseNo}, {task.shippingAddress?.area}{'\n'}
+              Pincode: {task.shippingAddress?.pincode}
+            </Text>
+          </View>
+          
+          <TouchableOpacity style={styles.callButton} onPress={openDialer}>
+            <Phone size={20} color="#10B981" />
+            <Text style={styles.callButtonText}>Call Customer</Text>
+          </TouchableOpacity>
+        </View>
+
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Order Information</Text>
           <View style={styles.infoRow}>
@@ -89,42 +264,17 @@ export default function TaskDetailsScreen({ route, navigation }: any) {
           </View>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Customer Information</Text>
-          <View style={styles.infoRow}>
-            <MapPin size={20} color="#6B7280" />
-            <Text style={styles.infoText}>
-              {task.shippingAddress?.houseNo}, {task.shippingAddress?.area}{'\n'}
-              Pincode: {task.shippingAddress?.pincode}
-            </Text>
-          </View>
-
-          <View style={styles.actionButtons}>
-            <TouchableOpacity style={styles.actionBtn} onPress={openMaps}>
-              <Navigation size={20} color="#8B5CF6" />
-              <Text style={styles.actionBtnText}>Navigate</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.actionBtn} onPress={openDialer}>
-              <Phone size={20} color="#8B5CF6" />
-              <Text style={styles.actionBtnText}>Call Customer</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
       </ScrollView>
 
+      {/* SWIPE FOOTER */}
       {nextAction && (
         <View style={styles.footer}>
-          <TouchableOpacity 
-            style={[styles.primaryButton, { backgroundColor: nextAction.color, opacity: updating ? 0.7 : 1 }]}
-            onPress={handleUpdateStatus}
+          <SwipeButton 
+            text={nextAction.label}
+            color={nextAction.color}
+            onComplete={handleUpdateStatus}
             disabled={updating}
-          >
-            <CheckCircle2 size={24} color="white" />
-            <Text style={styles.primaryButtonText}>
-              {updating ? 'Updating...' : nextAction.label}
-            </Text>
-          </TouchableOpacity>
+          />
         </View>
       )}
     </SafeAreaView>
@@ -132,119 +282,78 @@ export default function TaskDetailsScreen({ route, navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
+  container: { flex: 1, backgroundColor: '#F9FAFB' },
   header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    padding: 16, backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: '#F3F4F6',
+  },
+  backButton: { padding: 8 },
+  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#111827' },
+  content: { flex: 1, padding: 16 },
+  
+  // Map styles
+  mapContainer: {
+    height: 250,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 16,
+    backgroundColor: '#E5E7EB',
+    position: 'relative'
+  },
+  map: { width: '100%', height: '100%' },
+  mapLoading: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  mapNavigateBtn: {
+    position: 'absolute',
+    bottom: 16,
+    right: 16,
+    backgroundColor: '#111827',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#111827',
-  },
-  content: {
-    padding: 16,
-  },
-  card: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 16,
+
+  card: {
+    backgroundColor: 'white', borderRadius: 16, padding: 20, marginBottom: 16,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
   },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-    gap: 12,
+  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#111827', marginBottom: 16 },
+  infoRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12, gap: 12 },
+  infoText: { fontSize: 16, color: '#4B5563', flex: 1, lineHeight: 24 },
+  label: { fontSize: 16, color: '#6B7280', width: 120 },
+  valueText: { fontSize: 16, color: '#111827', fontWeight: '500' },
+  statusText: { fontSize: 14, fontWeight: '700', color: '#8B5CF6' },
+  priceText: { fontSize: 18, fontWeight: '700', color: '#10B981' },
+  
+  callButton: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    marginTop: 10, paddingVertical: 12, backgroundColor: '#10B98115', borderRadius: 12,
   },
-  infoText: {
-    fontSize: 16,
-    color: '#4B5563',
-    flex: 1,
-    lineHeight: 24,
-  },
-  label: {
-    fontSize: 16,
-    color: '#6B7280',
-    width: 120,
-  },
-  valueText: {
-    fontSize: 16,
-    color: '#111827',
-    fontWeight: '500',
-  },
-  statusText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#8B5CF6',
-  },
-  priceText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#10B981',
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-  },
-  actionBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 12,
-  },
-  actionBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#4B5563',
-  },
+  callButtonText: { color: '#10B981', fontWeight: '700', fontSize: 16 },
+
+  // Footer and Swipe Button
   footer: {
-    padding: 20,
-    backgroundColor: 'white',
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    backgroundColor: 'white', padding: 20,
+    borderTopWidth: 1, borderTopColor: '#F3F4F6',
+    paddingBottom: 30 // safe area for ios
   },
-  primaryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    paddingVertical: 16,
-    borderRadius: 16,
+  swipeTrackContainer: { width: '100%', height: SWIPE_THUMB_SIZE },
+  swipeTrack: {
+    width: '100%', height: '100%', borderRadius: SWIPE_THUMB_SIZE / 2,
+    justifyContent: 'center', alignItems: 'center', position: 'relative'
   },
-  primaryButtonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: '700',
-  },
+  swipeText: { fontSize: 16, fontWeight: '700', zIndex: 1 },
+  swipeThumb: {
+    position: 'absolute', left: 0, top: 0,
+    width: SWIPE_THUMB_SIZE, height: SWIPE_THUMB_SIZE, borderRadius: SWIPE_THUMB_SIZE / 2,
+    justifyContent: 'center', alignItems: 'center', zIndex: 2,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 3
+  }
 });
