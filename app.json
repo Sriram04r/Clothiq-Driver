@@ -11,6 +11,11 @@
       "bundleIdentifier": "com.clothiq.driver"
     },
     "android": {
+      "config": {
+        "googleMaps": {
+          "apiKey": "YOUR_API_KEY_HERE"
+        }
+      },
       "package": "com.clothiq.driver",
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
