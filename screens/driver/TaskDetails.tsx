@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Alert, Dimensions, Animated, PanResponder, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Alert, Dimensions, Animated, PanResponder, ActivityIndicator, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getFirestore, doc, updateDoc } from '@react-native-firebase/firestore';
 import { Phone, Package, Navigation, ChevronLeft, ChevronRight, MapPin } from 'lucide-react-native';
@@ -137,10 +137,13 @@ export default function TaskDetailsScreen({ route, navigation }: any) {
     }
   };
 
-  const openMaps = () => {
+  const handleNavigate = () => {
     const address = `${task.shippingAddress?.houseNo}, ${task.shippingAddress?.area}, ${task.shippingAddress?.pincode}`;
-    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
-    Linking.openURL(url);
+    const url = Platform.select({
+      ios: `maps:0,0?q=${encodeURIComponent(address)}`,
+      android: `geo:0,0?q=${encodeURIComponent(address)}`
+    });
+    Linking.openURL(url!);
   };
 
   const openDialer = () => {
@@ -220,11 +223,6 @@ export default function TaskDetailsScreen({ route, navigation }: any) {
               )}
             </MapView>
           )}
-          
-          <TouchableOpacity style={styles.mapNavigateBtn} onPress={openMaps}>
-            <Navigation size={18} color="white" />
-            <Text style={{ color: 'white', fontWeight: 'bold', marginLeft: 6 }}>Navigate</Text>
-          </TouchableOpacity>
         </View>
 
         {/* DETAILS SECTION */}
@@ -262,6 +260,14 @@ export default function TaskDetailsScreen({ route, navigation }: any) {
             <Text style={styles.label}>Total Collection:</Text>
             <Text style={styles.priceText}>₹{task.pricing?.total || 0}</Text>
           </View>
+
+          <TouchableOpacity 
+            style={styles.navigateButton}
+            onPress={handleNavigate}
+          >
+            <Navigation size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+            <Text style={styles.navigateText}>Navigate to Customer</Text>
+          </TouchableOpacity>
         </View>
 
       </ScrollView>
@@ -302,22 +308,6 @@ const styles = StyleSheet.create({
   },
   map: { width: '100%', height: '100%' },
   mapLoading: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  mapNavigateBtn: {
-    position: 'absolute',
-    bottom: 16,
-    right: 16,
-    backgroundColor: '#111827',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5
-  },
 
   card: {
     backgroundColor: 'white', borderRadius: 16, padding: 20, marginBottom: 16,
