@@ -73,15 +73,47 @@ export default function TaskDetailsScreen({ route, navigation }: any) {
   const [mapLoading, setMapLoading] = useState(true);
 
   useEffect(() => {
+    let locationSubscription: Location.LocationSubscription | null = null;
+
     (async () => {
       try {
         let { status } = await Location.requestForegroundPermissionsAsync();
         if (status === 'granted') {
+          // Get initial position
           let location = await Location.getCurrentPositionAsync({});
           setDriverCoords({
             latitude: location.coords.latitude,
             longitude: location.coords.longitude,
           });
+
+          // Start watching position
+          locationSubscription = await Location.watchPositionAsync(
+            {
+              accuracy: Location.Accuracy.Balanced,
+              timeInterval: 10000, // Update every 10 seconds
+              distanceInterval: 10, // Or every 10 meters
+            },
+            async (newLocation) => {
+              const coords = {
+                latitude: newLocation.coords.latitude,
+                longitude: newLocation.coords.longitude,
+              };
+              setDriverCoords(coords);
+
+              // Update Firestore in real-time
+              if (task && task.refPath) {
+                try {
+                  const db = getFirestore();
+                  const orderRef = doc(db, task.refPath);
+                  await updateDoc(orderRef, {
+                    driverLocation: coords
+                  });
+                } catch (e) {
+                  console.error("Error updating location to Firestore", e);
+                }
+              }
+            }
+          );
         }
 
         const addressStr = `${task.shippingAddress?.houseNo}, ${task.shippingAddress?.area}, ${task.shippingAddress?.pincode}`;
@@ -93,11 +125,17 @@ export default function TaskDetailsScreen({ route, navigation }: any) {
           });
         }
       } catch (error) {
-        console.error("Geocoding error", error);
+        console.error("Geocoding or tracking error", error);
       } finally {
         setMapLoading(false);
       }
     })();
+
+    return () => {
+      if (locationSubscription) {
+        locationSubscription.remove();
+      }
+    };
   }, []);
 
   const getNextStatusInfo = (currentStatus: string) => {
