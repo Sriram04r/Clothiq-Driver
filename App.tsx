@@ -5,6 +5,10 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
+import { Platform, Alert } from 'react-native';
+import { getFirestore, doc, updateDoc } from '@react-native-firebase/firestore';
 
 GoogleSignin.configure({
   webClientId: '930212381030-t1tg6a36ciu6n5220polmkaug00n3tug.apps.googleusercontent.com',
@@ -20,15 +24,25 @@ import ForgotPasswordScreen from './screens/ForgotPassword';
 import ResetPasswordScreen from './screens/ResetPassword';
 // User screens removed
 // Driver Screens
+import DashboardScreen from './screens/driver/Dashboard';
 import DriverHomeScreen from './screens/driver/DriverHome';
 import TaskDetailsScreen from './screens/driver/TaskDetails';
 import EarningsScreen from './screens/driver/Earnings';
 import ProfileScreen from './screens/driver/Profile';
-import { Home, IndianRupee, User } from 'lucide-react-native';
+import { Home, IndianRupee, User, ClipboardList } from 'lucide-react-native';
 
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
-import { useContext } from 'react';
+import { useContext, useEffect } from 'react';
+
+// Configure Notifications
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -55,10 +69,17 @@ function DriverTabs() {
       }}
     >
       <Tab.Screen 
+        name="Home" 
+        component={DashboardScreen} 
+        options={{
+          tabBarIcon: ({ color }) => <Home color={color} size={24} />
+        }}
+      />
+      <Tab.Screen 
         name="Tasks" 
         component={DriverHomeScreen} 
         options={{
-          tabBarIcon: ({ color, size }) => <Home color={color} size={24} />
+          tabBarIcon: ({ color }) => <ClipboardList color={color} size={24} />
         }}
       />
       <Tab.Screen 
@@ -81,6 +102,54 @@ function DriverTabs() {
 
 function RootNavigator() {
   const { user, initializing, wasLoggedIn, hasOnboarded, userRole } = useContext(AuthContext);
+
+  useEffect(() => {
+    if (user && userRole === 'driver') {
+      const registerForPushNotificationsAsync = async () => {
+        let token;
+        if (Platform.OS === 'android') {
+          await Notifications.setNotificationChannelAsync('default', {
+            name: 'default',
+            importance: Notifications.AndroidImportance.MAX,
+            vibrationPattern: [0, 250, 250, 250],
+            lightColor: '#FF231F7C',
+          });
+        }
+
+        if (Device.isDevice) {
+          const { status: existingStatus } = await Notifications.getPermissionsAsync();
+          let finalStatus = existingStatus;
+          if (existingStatus !== 'granted') {
+            const { status } = await Notifications.requestPermissionsAsync();
+            finalStatus = status;
+          }
+          if (finalStatus !== 'granted') {
+            Alert.alert('Failed to get push token for push notification!');
+            return;
+          }
+          try {
+            const projectId = 'b406e2ea-1c21-4f4f-bfa9-3220fb319df6'; // EAS Project ID or fallback
+            token = (await Notifications.getExpoPushTokenAsync({
+              projectId: projectId,
+            })).data;
+            
+            // Save token to firestore
+            const db = getFirestore();
+            await updateDoc(doc(db, 'users', user.uid), {
+              pushToken: token
+            });
+            console.log("Push token saved for driver:", token);
+          } catch (e) {
+            console.log("Push notification error:", e);
+          }
+        } else {
+          console.log('Must use physical device for Push Notifications');
+        }
+      };
+
+      registerForPushNotificationsAsync();
+    }
+  }, [user, userRole]);
 
   if (initializing) {
     return null; // Don't render until auth state is loaded
