@@ -383,5 +383,12 @@ const styles = StyleSheet.create({
     width: SWIPE_THUMB_SIZE, height: SWIPE_THUMB_SIZE, borderRadius: SWIPE_THUMB_SIZE / 2,
     justifyContent: 'center', alignItems: 'center', zIndex: 2,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 3
-  }
+  },
+  navigateButton: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    marginTop: 16, paddingVertical: 14, backgroundColor: '#2945FF', borderRadius: 12,
+  },
+  navigateText: {
+    color: '#FFFFFF', fontWeight: '700', fontSize: 16,
+  },
 });

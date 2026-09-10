@@ -2,7 +2,7 @@ import React, { useContext } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AuthContext } from '../../context/AuthContext';
-import auth from '@react-native-firebase/auth';
+import { getAuth, signOut } from '@react-native-firebase/auth';
 import { User, Mail, Phone, LogOut, ChevronRight, Truck } from 'lucide-react-native';
 
 export default function ProfileScreen() {
@@ -10,7 +10,7 @@ export default function ProfileScreen() {
 
   const handleLogout = async () => {
     try {
-      await auth().signOut();
+      await signOut(getAuth());
     } catch (error) {
       console.error("Error signing out: ", error);
     }

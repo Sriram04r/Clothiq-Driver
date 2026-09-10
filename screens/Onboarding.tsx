@@ -53,7 +53,7 @@ export default function OnboardingScreen() {
 
   const scrollToNext = () => {
     if (currentIndex < slides.length - 1) {
-      slidesRef.current?.scrollToIndex({ index: currentIndex + 1 });
+      (slidesRef.current as any)?.scrollToIndex({ index: currentIndex + 1 });
     } else {
       completeOnboarding();
     }

@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Eye, EyeOff } from 'lucide-react-native';
-import { FontAwesome5 } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { getAuth, signInWithEmailAndPassword, signInWithCredential, GoogleAuthProvider } from '@react-native-firebase/auth';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
@@ -146,10 +145,10 @@ export default function LoginScreen({ navigation }: any) {
               <GoogleIcon />
             </TouchableOpacity>
             <TouchableOpacity style={styles.socialButton}>
-              <FontAwesome5 name="facebook" size={24} color="#4267B2" />
+              <Text style={{ fontSize: 20 }}>📘</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.socialButton}>
-              <FontAwesome5 name="apple" size={24} color="#000000" />
+              <Text style={{ fontSize: 20 }}>🍎</Text>
             </TouchableOpacity>
           </View>
 

@@ -45,7 +45,7 @@ export default function EarningsScreen() {
         });
 
         // Sort locally by createdAt desc to avoid requiring a Firebase composite index
-        tasks.sort((a, b) => {
+        tasks.sort((a: any, b: any) => {
           const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
           const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
           return timeB - timeA;
