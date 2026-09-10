@@ -128,7 +128,7 @@ function RootNavigator() {
             return;
           }
           try {
-            const projectId = 'b406e2ea-1c21-4f4f-bfa9-3220fb319df6'; // EAS Project ID or fallback
+            const projectId = '7113382e-7de8-4757-8fbc-a1587dd09d54'; // EAS Project ID
             token = (await Notifications.getExpoPushTokenAsync({
               projectId: projectId,
             })).data;
