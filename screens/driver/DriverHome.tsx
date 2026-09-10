@@ -19,15 +19,16 @@ export default function DriverHomeScreen({ navigation }: any) {
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const isInitialLoad = useRef(true);
+  const previousStatuses = useRef<Record<string, string>>({});
 
-  const playNotification = async () => {
+  const playNotification = async (title: string, body: string) => {
     try {
       Vibration.vibrate([0, 400, 200, 400]); // Keep the vibration!
       
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: "New Task Assigned! 🚀",
-          body: "You have a new pickup/delivery request.",
+          title: title,
+          body: body,
           sound: 'default',
         },
         trigger: null,
@@ -58,21 +59,38 @@ export default function DriverHomeScreen({ navigation }: any) {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      if (!isInitialLoad.current) {
-        const hasNewTask = snapshot.docChanges().some(change => change.type === 'added');
-        if (hasNewTask) {
-          playNotification();
+      const taskList: any[] = [];
+      
+      snapshot.docs.forEach(doc => {
+        const data = doc.data();
+        const oldStatus = previousStatuses.current[doc.id];
+        
+        // Check for notifications
+        if (!isInitialLoad.current) {
+          if (!oldStatus) {
+            // It's a completely new task assigned to this driver
+            playNotification("New Task Assigned! 🚀", `Order #${doc.id.slice(-6).toUpperCase()} has been assigned to you.`);
+          } else if (oldStatus !== data.status) {
+            // The status was updated (by admin or by driver)
+            const cleanStatus = data.status.replace('_', ' ').toUpperCase();
+            playNotification("Task Updated 🔄", `Order #${doc.id.slice(-6).toUpperCase()} status is now: ${cleanStatus}`);
+          }
         }
-      }
-      isInitialLoad.current = false;
+        
+        // Update our tracking ref
+        previousStatuses.current[doc.id] = data.status;
+        
+        // Only show active tasks in the list
+        if (data.status !== 'delivered' && data.status !== 'cancelled') {
+          taskList.push({
+            id: doc.id,
+            refPath: doc.ref.path,
+            ...data
+          });
+        }
+      });
 
-      const taskList = snapshot.docs
-        .map(doc => ({
-          id: doc.id,
-          refPath: doc.ref.path,
-          ...doc.data()
-        }))
-        .filter((task: any) => task.status !== 'delivered' && task.status !== 'cancelled');
+      isInitialLoad.current = false;
       setTasks(taskList);
       setLoading(false);
     }, (error) => {
