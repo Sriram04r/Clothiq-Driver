@@ -33,12 +33,12 @@ export default function ProfileScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Contact Information</Text>
-          
+
           <View style={styles.infoRow}>
             <Mail size={20} color="#6b7280" style={styles.infoIcon} />
             <Text style={styles.infoText}>{user?.email || 'No email provided'}</Text>
           </View>
-          
+
           <View style={styles.infoRow}>
             <Phone size={20} color="#6b7280" style={styles.infoIcon} />
             <Text style={styles.infoText}>{user?.phoneNumber || 'No phone number provided'}</Text>
@@ -60,8 +60,8 @@ export default function ProfileScreen() {
           <LogOut size={20} color="#ef4444" style={{ marginRight: 8 }} />
           <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>
-        
-        <Text style={styles.versionText}>Clothiq Driver v1.0.0</Text>
+
+        <Text style={styles.versionText}></Text>
       </ScrollView>
     </SafeAreaView>
   );
