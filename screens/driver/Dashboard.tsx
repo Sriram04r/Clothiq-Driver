@@ -190,7 +190,7 @@ export default function DashboardScreen({ navigation }: any) {
             <View style={styles.taskActions}>
               <TouchableOpacity 
                 style={styles.detailsBtn}
-                onPress={() => navigation.navigate('TaskDetails', { orderId: nextTask.id, userId: nextTask.userId })}
+                onPress={() => navigation.navigate('TaskDetails', { task: nextTask })}
               >
                 <Text style={styles.detailsBtnText}>View Details</Text>
               </TouchableOpacity>
