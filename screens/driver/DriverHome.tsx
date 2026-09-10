@@ -28,9 +28,9 @@ export default function DriverHomeScreen({ navigation }: any) {
         content: {
           title: "New Task Assigned! 🚀",
           body: "You have a new pickup/delivery request.",
-          sound: true, 
+          sound: 'default',
         },
-        trigger: null, 
+        trigger: null,
       });
     } catch (error) {
       console.log("Notification error", error);
@@ -54,8 +54,7 @@ export default function DriverHomeScreen({ navigation }: any) {
     const db = getFirestore();
     const q = query(
       collectionGroup(db, 'orders'),
-      where('driverId', '==', user.uid),
-      where('status', 'in', ['pickup_ready', 'out_for_pickup', 'delivery_ready', 'out_for_delivery'])
+      where('driverId', '==', user.uid)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -67,11 +66,13 @@ export default function DriverHomeScreen({ navigation }: any) {
       }
       isInitialLoad.current = false;
 
-      const taskList = snapshot.docs.map(doc => ({
-        id: doc.id,
-        refPath: doc.ref.path,
-        ...doc.data()
-      }));
+      const taskList = snapshot.docs
+        .map(doc => ({
+          id: doc.id,
+          refPath: doc.ref.path,
+          ...doc.data()
+        }))
+        .filter((task: any) => task.status !== 'delivered' && task.status !== 'cancelled');
       setTasks(taskList);
       setLoading(false);
     }, (error) => {
