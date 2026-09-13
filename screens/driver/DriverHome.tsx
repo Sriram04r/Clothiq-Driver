@@ -71,11 +71,11 @@ export default function DriverHomeScreen({ navigation }: any) {
         if (!isInitialLoad.current) {
           if (!oldStatus) {
             // It's a completely new task assigned to this driver
-            playNotification("New Task Assigned! 🚀", `Order #${doc.id.slice(-6).toUpperCase()} has been assigned to you.`);
+            playNotification("New Task Assigned! 🚀", `Order #FW${doc.id.substring(0, 6).toUpperCase()} has been assigned to you.`);
           } else if (oldStatus !== data.status) {
             // The status was updated (by admin or by driver)
             const cleanStatus = data.status.replace('_', ' ').toUpperCase();
-            playNotification("Task Updated 🔄", `Order #${doc.id.slice(-6).toUpperCase()} status is now: ${cleanStatus}`);
+            playNotification("Task Updated 🔄", `Order #FW${doc.id.substring(0, 6).toUpperCase()} status is now: ${cleanStatus}`);
           }
         }
         
@@ -134,7 +134,7 @@ export default function DriverHomeScreen({ navigation }: any) {
       <View style={styles.taskHeader}>
         <View style={styles.orderIdContainer}>
           <Package size={16} color="#6B7280" />
-          <Text style={styles.orderId}>Order #{item.id.slice(-6).toUpperCase()}</Text>
+          <Text style={styles.orderId}>Order #FW{item.id.substring(0, 6).toUpperCase()}</Text>
         </View>
         <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + '20' }]}>
           <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>{getStatusText(item.status)}</Text>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Alert, Dimensions, Animated, PanResponder, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Alert, Dimensions, Animated, PanResponder, ActivityIndicator, Platform, Modal, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getFirestore, doc, updateDoc } from '@react-native-firebase/firestore';
 import { Phone, Package, Navigation, ChevronLeft, ChevronRight, MapPin } from 'lucide-react-native';
@@ -71,6 +71,9 @@ export default function TaskDetailsScreen({ route, navigation }: any) {
   const [customerCoords, setCustomerCoords] = useState<any>(null);
   const [driverCoords, setDriverCoords] = useState<any>(null);
   const [mapLoading, setMapLoading] = useState(true);
+  const [showTagModal, setShowTagModal] = useState(false);
+  const [bagTag, setBagTag] = useState('');
+  const [swipeKey, setSwipeKey] = useState(0);
 
   useEffect(() => {
     let locationSubscription: Location.LocationSubscription | null = null;
@@ -155,16 +158,19 @@ export default function TaskDetailsScreen({ route, navigation }: any) {
 
   const nextAction = getNextStatusInfo(task.status);
 
-  const handleUpdateStatus = async () => {
+  const handleUpdateStatus = async (tagNumber: string = '') => {
     if (!nextAction) return;
 
     setUpdating(true);
     try {
       const db = getFirestore();
       const orderRef = doc(db, task.refPath);
-      await updateDoc(orderRef, {
-        status: nextAction.next
-      });
+      
+      const updateData: any = { status: nextAction.next };
+      if (tagNumber) updateData.bagTag = tagNumber;
+
+      await updateDoc(orderRef, updateData);
+      
       setTimeout(() => {
         navigation.goBack();
       }, 500); // small delay to see the swipe complete
@@ -172,8 +178,33 @@ export default function TaskDetailsScreen({ route, navigation }: any) {
       console.error("Error updating status:", error);
       Alert.alert("Error", "Could not update task status.");
       setUpdating(false);
+      setSwipeKey(prev => prev + 1); // Reset swipe button on error
     }
   };
+
+  const onSwipeComplete = () => {
+    if (nextAction?.next === 'in_progress') {
+      setShowTagModal(true);
+    } else {
+      handleUpdateStatus();
+    }
+  };
+
+  const submitBagTag = () => {
+    if (!bagTag.trim()) {
+      Alert.alert('Error', 'Please enter a valid bag tag number.');
+      return;
+    }
+    setShowTagModal(false);
+    handleUpdateStatus(bagTag.trim());
+  };
+
+  const cancelBagTag = () => {
+    setShowTagModal(false);
+    setBagTag('');
+    setSwipeKey(prev => prev + 1); // Reset swipe button
+  };
+
 
   const handleNavigate = () => {
     const address = `${task.shippingAddress?.houseNo}, ${task.shippingAddress?.area}, ${task.shippingAddress?.pincode}`;
@@ -237,29 +268,10 @@ export default function TaskDetailsScreen({ route, navigation }: any) {
               <Text style={{ marginTop: 8, color: '#6B7280' }}>Loading map...</Text>
             </View>
           ) : (
-            <MapView
-              style={styles.map}
-              initialRegion={getMapRegion()}
-              showsUserLocation={true}
-            >
-              {customerCoords && (
-                <Marker 
-                  coordinate={customerCoords} 
-                  title="Customer Location" 
-                  description="Pickup/Delivery point"
-                  pinColor="red"
-                />
-              )}
-              {driverCoords && customerCoords && (
-                <Polyline
-                  coordinates={[driverCoords, customerCoords]}
-                  strokeColor="#3B82F6"
-                  strokeWidth={4}
-                  geodesic={true}
-                  lineDashPattern={[0]}
-                />
-              )}
-            </MapView>
+            <View style={[styles.map, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#F3F4F6' }]}>
+              <MapPin size={32} color="#9CA3AF" />
+              <Text style={{ marginTop: 8, color: '#6B7280', fontSize: 14, fontWeight: '500' }}>Live map is temporarily disabled</Text>
+            </View>
           )}
         </View>
 
@@ -284,7 +296,7 @@ export default function TaskDetailsScreen({ route, navigation }: any) {
           <Text style={styles.sectionTitle}>Order Information</Text>
           <View style={styles.infoRow}>
             <Package size={20} color="#6B7280" />
-            <Text style={styles.infoText}>Order #{task.id.slice(-6).toUpperCase()}</Text>
+            <Text style={styles.infoText}>Order #FW{task.id.substring(0, 6).toUpperCase()}</Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.label}>Status:</Text>
@@ -308,15 +320,44 @@ export default function TaskDetailsScreen({ route, navigation }: any) {
           </TouchableOpacity>
         </View>
 
+        {/* MODAL FOR ENTERING BAG TAG */}
+        <Modal visible={showTagModal} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Enter Bag Tag</Text>
+              <Text style={styles.modalSub}>Please enter the physical tag number you attached to this bag.</Text>
+              
+              <TextInput 
+                style={styles.tagInput}
+                placeholder="e.g. TAG-123"
+                value={bagTag}
+                onChangeText={setBagTag}
+                autoCapitalize="characters"
+              />
+              
+              <View style={styles.modalActions}>
+                <TouchableOpacity style={styles.modalBtnCancel} onPress={cancelBagTag}>
+                  <Text style={styles.modalBtnCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.modalBtnSubmit} onPress={submitBagTag}>
+                  <Text style={styles.modalBtnSubmitText}>Submit</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
       </ScrollView>
+
 
       {/* SWIPE FOOTER */}
       {nextAction && (
         <View style={styles.footer}>
           <SwipeButton 
-            text={nextAction.label}
-            color={nextAction.color}
-            onComplete={handleUpdateStatus}
+            key={swipeKey}
+            text={nextAction.label} 
+            color={nextAction.color} 
+            onComplete={onSwipeComplete}
             disabled={updating}
           />
         </View>
@@ -391,4 +432,37 @@ const styles = StyleSheet.create({
   navigateText: {
     color: '#FFFFFF', fontWeight: '700', fontSize: 16,
   },
+  modalOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center'
+  },
+  modalContent: {
+    backgroundColor: '#FFF', width: '85%', borderRadius: 16, padding: 24,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5
+  },
+  modalTitle: {
+    fontSize: 20, fontWeight: '700', color: '#111827', marginBottom: 8, textAlign: 'center'
+  },
+  modalSub: {
+    fontSize: 14, color: '#6B7280', marginBottom: 20, textAlign: 'center', lineHeight: 20
+  },
+  tagInput: {
+    borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, padding: 16,
+    fontSize: 18, fontWeight: '600', color: '#111827', textAlign: 'center', backgroundColor: '#F9FAFB',
+    marginBottom: 24
+  },
+  modalActions: {
+    flexDirection: 'row', gap: 12
+  },
+  modalBtnCancel: {
+    flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: '#F3F4F6', alignItems: 'center'
+  },
+  modalBtnCancelText: {
+    color: '#4B5563', fontWeight: '600', fontSize: 16
+  },
+  modalBtnSubmit: {
+    flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: '#2945FF', alignItems: 'center'
+  },
+  modalBtnSubmitText: {
+    color: '#FFFFFF', fontWeight: '600', fontSize: 16
+  }
 });

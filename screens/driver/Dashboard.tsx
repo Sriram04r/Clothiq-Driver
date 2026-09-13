@@ -44,6 +44,7 @@ export default function DashboardScreen({ navigation }: any) {
           pendingCount++;
           activeOrders.push({
             ...order,
+            refPath: doc.ref.path,
             // Assuming customer userId is stored in doc reference parent
             userId: doc.ref.parent.parent?.id 
           });
@@ -78,6 +79,13 @@ export default function DashboardScreen({ navigation }: any) {
     return () => unsubscribe();
   }, [user]);
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good Morning,';
+    if (hour < 17) return 'Good Afternoon,';
+    return 'Good Evening,';
+  };
+
   const getTaskStatusLabel = (status: string) => {
     switch (status) {
       case 'placed_cod':
@@ -95,7 +103,7 @@ export default function DashboardScreen({ navigation }: any) {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>Good Morning,</Text>
+          <Text style={styles.greeting}>{getGreeting()}</Text>
           <Text style={styles.driverName}>Driver</Text>
         </View>
         <View style={styles.onlineToggle}>
@@ -162,7 +170,7 @@ export default function DashboardScreen({ navigation }: any) {
                   {getTaskStatusLabel(nextTask.status)}
                 </Text>
               </View>
-              <Text style={styles.taskTime}>Order #{nextTask.id.substring(0,6).toUpperCase()}</Text>
+              <Text style={styles.taskTime}>Order #FW{nextTask.id.substring(0, 6).toUpperCase()}</Text>
             </View>
 
             <View style={styles.addressContainer}>
