@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Alert, Dimensions, Animated, PanResponder, ActivityIndicator, Platform, Modal, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getFirestore, doc, updateDoc } from '@react-native-firebase/firestore';
-import { Phone, Package, Navigation, ChevronLeft, ChevronRight, MapPin } from 'lucide-react-native';
+import { Phone, Package, Navigation, ChevronLeft, ChevronRight, MapPin, QrCode as QRIcon } from 'lucide-react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
+import QRCode from 'react-native-qrcode-svg';
 import * as Location from 'expo-location';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -72,6 +73,7 @@ export default function TaskDetailsScreen({ route, navigation }: any) {
   const [driverCoords, setDriverCoords] = useState<any>(null);
   const [mapLoading, setMapLoading] = useState(true);
   const [showTagModal, setShowTagModal] = useState(false);
+  const [showQRModal, setShowQRModal] = useState(false);
   const [bagTag, setBagTag] = useState('');
   const [swipeKey, setSwipeKey] = useState(0);
 
@@ -310,6 +312,16 @@ export default function TaskDetailsScreen({ route, navigation }: any) {
             <Text style={styles.label}>Total Collection:</Text>
             <Text style={styles.priceText}>₹{task.pricing?.total || 0}</Text>
           </View>
+          
+          {task.paymentMethod === 'upi_qr' && (
+            <TouchableOpacity 
+              style={[styles.navigateButton, { backgroundColor: '#3B82F6', marginTop: 8 }]}
+              onPress={() => setShowQRModal(true)}
+            >
+              <QRIcon size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+              <Text style={styles.navigateText}>Show Payment QR</Text>
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity 
             style={styles.navigateButton}
@@ -343,6 +355,30 @@ export default function TaskDetailsScreen({ route, navigation }: any) {
                   <Text style={styles.modalBtnSubmitText}>Submit</Text>
                 </TouchableOpacity>
               </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* MODAL FOR QR CODE */}
+        <Modal visible={showQRModal} transparent animationType="fade" onRequestClose={() => setShowQRModal(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Scan to Pay</Text>
+              <Text style={styles.modalSub}>Customer can scan this with PhonePe, GPay, or any UPI app to pay ₹{task.pricing?.total || 0}</Text>
+              
+              <View style={{ alignItems: 'center', marginVertical: 20 }}>
+                <QRCode
+                  value={`upi://pay?pa=9014428656@axl&pn=Clothiq&tn=Order_${task.id}&am=${task.pricing?.total || 0}&cu=INR`}
+                  size={200}
+                />
+              </View>
+              
+              <TouchableOpacity 
+                style={styles.modalBtnCancel} 
+                onPress={() => setShowQRModal(false)}
+              >
+                <Text style={styles.modalBtnCancelText}>Close QR Code</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </Modal>
