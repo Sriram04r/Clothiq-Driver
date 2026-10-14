@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 
-export default function SplashScreen({ navigation }: any) {
+export default function SplashScreen({ onFinish }: { onFinish?: () => void }) {
   // Animation Values
   const iconX = useRef(new Animated.Value(-width)).current; // Starts off-screen to the left
   const iconScale = useRef(new Animated.Value(0.7)).current; // Starts slightly smaller
@@ -49,14 +49,35 @@ export default function SplashScreen({ navigation }: any) {
           useNativeDriver: true,
         }),
       ])
-    ]).start();
+    ]).start(() => {
+      // 2. Start infinite pulse animation on the logo after fade in
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(iconScale, {
+            toValue: 1.08,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(iconScale, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+
+      // Auto-finish splash screen after 2.5 seconds
+      setTimeout(() => {
+        if (onFinish) onFinish();
+      }, 2500);
+    });
   }, []);
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.topSection}>
         <Animated.View style={[styles.logoSection, { transform: [{ translateX: iconX }, { scale: iconScale }] }]}>
-          <Image source={require('../assets/icon.jpg')} style={styles.mainImage} resizeMode="contain" />
+          <Image source={require('../assets/driver-logo.png')} style={styles.mainImage} resizeMode="contain" />
         </Animated.View>
         
         <Animated.View style={[styles.textSection, { opacity: contentOpacity }]}>
@@ -65,15 +86,6 @@ export default function SplashScreen({ navigation }: any) {
         </Animated.View>
       </View>
 
-      <Animated.View style={[styles.bottomSection, { opacity: buttonOpacity, transform: [{ translateY: buttonY }] }]}>
-        <TouchableOpacity 
-          style={styles.button} 
-          onPress={() => navigation.navigate('Login')}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.buttonText}>Get Started</Text>
-        </TouchableOpacity>
-      </Animated.View>
     </SafeAreaView>
   );
 }

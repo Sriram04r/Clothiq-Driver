@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, useNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -153,8 +153,14 @@ function RootNavigator() {
     }
   }, [user, userRole]);
 
+  const [showSplash, setShowSplash] = React.useState(true);
+
   if (initializing) {
     return null; // Don't render until auth state is loaded
+  }
+
+  if (showSplash) {
+    return <SplashScreen onFinish={() => setShowSplash(false)} />;
   }
 
   return (
@@ -166,7 +172,6 @@ function RootNavigator() {
         </>
       ) : (
         <>
-          {!wasLoggedIn && <Stack.Screen name="Splash" component={SplashScreen} />}
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Signup" component={SignupScreen} />
           <Stack.Screen name="OTPVerification" component={OTPVerificationScreen} />
@@ -179,11 +184,27 @@ function RootNavigator() {
 }
 
 export default function App() {
+  const navigationRef = useNavigationContainerRef();
+
+  React.useEffect(() => {
+    const subscription = Notifications.addNotificationResponseReceivedListener(response => {
+      const data = response.notification.request.content.data;
+      if (data?.screen) {
+        setTimeout(() => {
+          if (navigationRef.isReady()) {
+            navigationRef.navigate(data.screen as never);
+          }
+        }, 500);
+      }
+    });
+    return () => subscription.remove();
+  }, [navigationRef]);
+
   return (
     <SafeAreaProvider>
       <AuthProvider>
         <CartProvider>
-          <NavigationContainer>
+          <NavigationContainer ref={navigationRef}>
             <StatusBar style="dark" />
             <RootNavigator />
           </NavigationContainer>
