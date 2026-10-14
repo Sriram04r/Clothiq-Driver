@@ -141,14 +141,9 @@ export default function LoginScreen({ navigation }: any) {
           </View>
 
           <View style={styles.socialContainer}>
-            <TouchableOpacity style={styles.socialButton} onPress={handleGoogleLogin}>
+            <TouchableOpacity style={styles.googleButton} onPress={handleGoogleLogin}>
               <GoogleIcon />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.socialButton}>
-              <Text style={{ fontSize: 20 }}>📘</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.socialButton}>
-              <Text style={{ fontSize: 20 }}>🍎</Text>
+              <Text style={styles.googleButtonText}>Continue with Google</Text>
             </TouchableOpacity>
           </View>
 
@@ -300,15 +295,22 @@ const styles = StyleSheet.create({
     gap: 20,
     marginBottom: 40,
   },
-  socialButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    width: '100%',
+    height: 56,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#e5e5ea',
-    justifyContent: 'center',
-    alignItems: 'center',
     backgroundColor: '#FFFFFF',
+  },
+  googleButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111111',
   },
   socialIcon: {
     fontSize: 24,
